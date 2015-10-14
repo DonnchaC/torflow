@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# [SublimeLinter pep8-ignore:+E501]
 import os
 import re
 import math
@@ -32,7 +33,7 @@ IGNORE_GUARDS = 0
 
 # The guard measurement period is based on the client turnover
 # rate for guard nodes
-GUARD_SAMPLE_RATE = 2*7*24*60*60 # 2wks
+GUARD_SAMPLE_RATE = 2*7*24*60*60  # 2wks
 
 # PID constant defaults. May be overridden by consensus
 # https://en.wikipedia.org/wiki/PID_controller#Ideal_versus_standard_PID_form
@@ -55,7 +56,7 @@ T_d = 0
 
 NODE_CAP = 0.05
 
-MIN_REPORT = 60 # Percent of the network we must measure before reporting
+MIN_REPORT = 60  # Percent of the network we must measure before reporting
 
 # Keep most measurements in consideration. The code below chooses
 # the most recent one. 28 days is just to stop us from choking up
@@ -71,6 +72,7 @@ MAX_SCAN_AGE = 60*60*24*1.5
 PATH_TO_TORFLOW_REPO = '../../.git/'
 PATH_TO_TORCTL_REPO = '../../.git/modules/TorCtl/'
 
+
 def base10_round(bw_val):
     # This keeps the first 3 decimal digits of the bw value only
     # to minimize changes for consensus diffs.
@@ -79,11 +81,12 @@ def base10_round(bw_val):
         logger.info("Zero input bandwidth.. Upping to 1")
         return 1
     else:
-        ret = int(max((1000, round(round(bw_val,-(int(math.log10(bw_val))-2)), -3)))/1000)
+        ret = int(max((1000, round(round(bw_val, -(int(math.log10(bw_val))-2)), -3)))/1000)
         if ret == 0:
             logger.info("Zero output bandwidth.. Upping to 1")
             return 1
         return ret
+
 
 class Node:
     def __init__(self):
@@ -115,28 +118,28 @@ class Node:
 
     def revert_to_vote(self, vote):
         self.copy_vote(vote)
-        self.pid_error = vote.pid_error # Set
-        self.measured_at = vote.measured_at # Set
+        self.pid_error = vote.pid_error  # Set
+        self.measured_at = vote.measured_at  # Set
 
     def copy_vote(self, vote):
-        self.new_bw = vote.bw*1000 # Not set yet
-        self.pid_bw = vote.pid_bw    # Not set yet
-        self.pid_error_sum = vote.pid_error_sum # Not set yet
-        self.pid_delta = vote.pid_delta # Not set yet
+        self.new_bw = vote.bw*1000  # Not set yet
+        self.pid_bw = vote.pid_bw  # Not set yet
+        self.pid_error_sum = vote.pid_error_sum  # Not set yet
+        self.pid_delta = vote.pid_delta  # Not set yet
 
     def get_pid_bw(self, prev_vote, kp, ki, kd, kidecay, update=True):
         if not update:
             return self.use_bw \
-                                    + kp*self.use_bw*self.pid_error \
-                                    + ki*self.use_bw*self.pid_error_sum \
-                                    + kd*self.use_bw*self.pid_delta
+                + kp*self.use_bw*self.pid_error \
+                + ki*self.use_bw*self.pid_error_sum \
+                + kd*self.use_bw*self.pid_delta
 
         self.prev_error = prev_vote.pid_error
 
         self.pid_bw = self.use_bw \
-                                                         + kp*self.use_bw*self.pid_error \
-                                                         + ki*self.use_bw*self.integral_error() \
-                                                         + kd*self.use_bw*self.d_error_dt()
+            + kp*self.use_bw*self.pid_error \
+            + ki*self.use_bw*self.integral_error() \
+            + kd*self.use_bw*self.d_error_dt()
 
         # We decay the interval each round to keep it bounded.
         # This decay is non-standard. We do it to avoid overflow
@@ -181,6 +184,7 @@ class Node:
             self.desc_bw = line.desc_bw
             self.circ_fail_rate = line.circ_fail_rate
             self.strm_fail_rate = line.strm_fail_rate
+
 
 class Line:
     def __init__(self, line, slice_file, timestamp):
@@ -308,7 +312,7 @@ class ConsensusJunk:
             if c_params.get('bwauthguardrate'):
                 self.guard_sample_rate = int(c_params.get('bwauthguardrate'))
                 logger.info("Got guard_sample_rate=%d from consensus." %
-                     self.guard_sample_rate)
+                            self.guard_sample_rate)
 
         if self.T_i == 0:
             self.K_i = 0
@@ -320,7 +324,7 @@ class ConsensusJunk:
         self.K_d = self.K_p*self.T_d
 
         logger.info("Got K_p=%f K_i=%f K_d=%f K_i_decay=%f" %
-             (self.K_p, self.K_i, self.K_d, self.K_i_decay))
+                    (self.K_p, self.K_i, self.K_d, self.K_i_decay))
 
         self.bw_weights = {}
         if bw_weights:
@@ -333,9 +337,22 @@ class ConsensusJunk:
 
 
 def write_file_list(datadir):
-    files = {64*1024:"64M", 32*1024:"32M", 16*1024:"16M", 8*1024:"8M",
-                                4*1024:"4M", 2*1024:"2M", 1024:"1M", 512:"512k",
-                                256:"256k", 128:"128k", 64:"64k", 32:"32k", 16:"16k", 0:"16k"}
+    files = {
+        64*1024: "64M",
+        32*1024: "32M",
+        16*1024: "16M",
+        8*1024: "8M",
+        4*1024: "4M",
+        2*1024: "2M",
+        1024: "1M",
+        512: "512k",
+        256: "256k",
+        128: "128k",
+        64: "64k",
+        32: "32k",
+        16: "16k",
+        0: "16k",
+    }
     file_sizes = files.keys()
     node_fbws = map(lambda x: 5*x.filt_bw, nodes.itervalues())
     file_pairs = []
@@ -356,8 +373,8 @@ def write_file_list(datadir):
             continue
         for f in xrange(len(file_sizes)):
             if bw > file_sizes[f]*1024 and file_sizes[f] > prev_size:
-                next_f = max(f-1,0)
-                file_pairs.append((pct,files[file_sizes[next_f]]))
+                next_f = max(f-1, 0)
+                file_pairs.append((pct, files[file_sizes[next_f]]))
                 prev_size = file_sizes[f]
                 prev_pct = pct
                 break
@@ -366,7 +383,7 @@ def write_file_list(datadir):
 
     outfile = file(datadir+"/bwfiles.new", "w")
     for f in file_pairs:
-     outfile.write(str(f[0])+" "+f[1]+"\n")
+        outfile.write(str(f[0])+" "+f[1]+"\n")
     outfile.write(".\n")
     outfile.close()
     # atomic on POSIX
@@ -404,10 +421,12 @@ def main(argv):
     ns_list = list(c.get_network_statuses())
 
     for n in ns_list:
-        if n.bandwidth == None: n.bandwidth = -1
+        if n.bandwidth is None:
+            n.bandwidth = -1
     ns_list.sort(lambda x, y: int(y.bandwidth/10000.0 - x.bandwidth/10000.0))
     for n in ns_list:
-        if n.bandwidth == -1: n.bandwidth = None
+        if n.bandwidth == -1:
+            n.bandwidth = None
     got_ns_bw = False
     max_rank = len(ns_list)
 
@@ -418,7 +437,7 @@ def main(argv):
     for i in xrange(max_rank):
         n = ns_list[i]
         n.list_rank = i
-        if n.bandwidth == None:
+        if n.bandwidth is None:
             logger.info("Your Tor is not providing NS w bandwidths for "+n.fingerprint)
         else:
             got_ns_bw = True
@@ -460,7 +479,7 @@ def main(argv):
                                     try:
                                         os.remove(sr+"/"+sqlf)
                                     except:
-                                        pass # In some cases the sql file may not exist
+                                        pass  # In some cases the sql file may not exist
                                     continue
                                 if timestamp > newest_timestamp:
                                     newest_timestamp = timestamp
@@ -468,20 +487,20 @@ def main(argv):
                     scanner_timestamps[ds] = newest_timestamp
 
     # Need to only use most recent slice-file for each node..
-    for (s,t,f) in bw_files:
+    for (s, t, f) in bw_files:
         fp = file(f, "r")
-        fp.readline() # slicenum
-        fp.readline() # timestamp
+        fp.readline()  # slicenum
+        fp.readline()  # timestamp
         for l in fp.readlines():
             try:
-                line = Line(l,s,t)
+                line = Line(l, s, t)
                 if line.fingerprint not in nodes:
                     n = Node()
                     nodes[line.fingerprint] = n
                 else:
                     n = nodes[line.fingerprint]
                 n.add_line(line)
-            except ValueError,e:
+            except ValueError, e:
                 logger.info("Conversion error "+str(e)+" at "+l)
             except AttributeError, e:
                 logger.info("Slice file format error "+str(e)+" at "+l)
@@ -533,10 +552,12 @@ def main(argv):
             logger.info("Network pid_tgt_avg["+cl+"]: "+str(pid_tgt_avg[cl]))
             logger.info("Network true_circ_avg["+cl+"]: "+str(true_circ_avg[cl]))
 
-        filt_avg = sum(map(lambda n: n.filt_bw, nodes.itervalues()))/float(len(nodes))
-        strm_avg = sum(map(lambda n: n.strm_bw, nodes.itervalues()))/float(len(nodes))
+        filt_avg = sum(map(lambda n: n.filt_bw,
+                           nodes.itervalues()))/float(len(nodes))
+        strm_avg = sum(map(lambda n: n.strm_bw,
+                           nodes.itervalues()))/float(len(nodes))
         circ_avg = sum(map(lambda n: (1.0-n.circ_fail_rate),
-                                             nodes.itervalues()))/float(len(nodes))
+                           nodes.itervalues()))/float(len(nodes))
         logger.info("Network filt_avg: "+str(filt_avg))
         logger.info("Network circ_avg: "+str(circ_avg))
 
@@ -566,7 +587,6 @@ def main(argv):
         for cl in ["Guard+Exit", "Guard", "Exit", "Middle"]:
             true_filt_avg[cl] = filt_avg
             true_strm_avg[cl] = strm_avg
-
 
     prev_votes = None
     if cs_junk.bwauth_pid_control:
@@ -643,18 +663,18 @@ def main(argv):
                              "CPU overload for %s node %s=%s desc=%d ns=%d pid_error=%f circ_error=%f circ_fail=%f" %
                              (n.node_class(), n.nickname, n.fingerprint, n.desc_bw, n.ns_bw,
                               n.pid_error, circ_error, n.circ_fail_rate))
-                        n.pid_error = min(circ_error,n.pid_error)
+                        n.pid_error = min(circ_error, n.pid_error)
 
             # Don't accumulate too much amplification for fast nodes
             if cs_junk.use_desc_bw:
                 if n.pid_error_sum > cs_junk.pid_max and n.pid_error > 0:
                     logger.info("Capping feedback for %s node %s=%s desc=%d ns=%d pid_error_sum=%f" %
-                            (n.node_class(), n.nickname, n.fingerprint, n.desc_bw, n.ns_bw, n.pid_error_sum))
+                                (n.node_class(), n.nickname, n.fingerprint, n.desc_bw, n.ns_bw, n.pid_error_sum))
                     n.pid_error_sum = cs_junk.pid_max
             else:
                 if float(n.ns_bw)/n.desc_bw > cs_junk.pid_max and n.pid_error > 0:
                     logger.info("Capping feedback for %s node %s=%s desc=%d ns=%d pid_error=%f" %
-                            (n.node_class(), n.nickname, n.fingerprint, n.desc_bw, n.ns_bw, n.pid_error))
+                                (n.node_class(), n.nickname, n.fingerprint, n.desc_bw, n.ns_bw, n.pid_error))
                     n.pid_error = 0
                     n.pid_error_sum = 0
 
@@ -665,11 +685,11 @@ def main(argv):
                     # let's just not and say we did.
                     if n.desc_bw > n.ns_bw and n.pid_error < 0:
                         logger.debug("Showing mercy for %s node %s=%s desc=%d ns=%d pid_error=%f" %
-                                 (n.node_class(), n.nickname, n.fingerprint, n.desc_bw, n.ns_bw, n.pid_error))
+                                     (n.node_class(), n.nickname, n.fingerprint, n.desc_bw, n.ns_bw, n.pid_error))
                         n.use_bw = n.desc_bw
                 if n.pid_error_sum < 0 and n.pid_error < 0:
                     logger.debug("Showing mercy for %s node %s=%s desc=%d ns=%d pid_error_sum=%f" %
-                            (n.node_class(), n.nickname, n.fingerprint, n.desc_bw, n.ns_bw, n.pid_error_sum))
+                                 (n.node_class(), n.nickname, n.fingerprint, n.desc_bw, n.ns_bw, n.pid_error_sum))
                     n.pid_error_sum = 0
 
             if n.fingerprint in prev_votes.vote_map:
@@ -680,17 +700,17 @@ def main(argv):
                     # so they should be sampled less often, and in proportion to
                     # the appropriate Wgx weight.
                     if n.fingerprint in prev_consensus and \
-                        ("Guard" in prev_consensus[n.fingerprint].flags \
+                        ("Guard" in prev_consensus[n.fingerprint].flags
                          and "Exit" not in prev_consensus[n.fingerprint].flags):
                         # Do full feedback if our previous vote > 2.5 weeks old
                         if n.fingerprint not in prev_votes.vote_map or \
                                 n.measured_at - prev_votes.vote_map[n.fingerprint].measured_at \
-                                        > cs_junk.guard_sample_rate:
+                                > cs_junk.guard_sample_rate:
                             n.new_bw = n.get_pid_bw(prev_votes.vote_map[n.fingerprint],
-                                                                            cs_junk.K_p,
-                                                                            cs_junk.K_i,
-                                                                            cs_junk.K_d,
-                                                                            cs_junk.K_i_decay)
+                                                    cs_junk.K_p,
+                                                    cs_junk.K_i,
+                                                    cs_junk.K_d,
+                                                    cs_junk.K_i_decay)
                         else:
                             # Don't use feedback here, but we might as well use our
                             # new measurement against the previous vote.
@@ -698,10 +718,10 @@ def main(argv):
 
                             if cs_junk.use_desc_bw:
                                 n.new_bw = n.get_pid_bw(prev_votes.vote_map[n.fingerprint],
-                                                                        cs_junk.K_p,
-                                                                        cs_junk.K_i,
-                                                                        cs_junk.K_d,
-                                                                        0.0, False)
+                                                        cs_junk.K_p,
+                                                        cs_junk.K_i,
+                                                        cs_junk.K_d,
+                                                        0.0, False)
                             else:
                                 # Use previous vote's feedback bw
                                 # FIXME: compare to ns_bw or prev_vote bw?
@@ -710,10 +730,10 @@ def main(argv):
                                 else:
                                     n.use_bw = prev_votes.vote_map[n.fingerprint].pid_bw
                                 n.new_bw = n.get_pid_bw(prev_votes.vote_map[n.fingerprint],
-                                                                        cs_junk.K_p,
-                                                                        0.0,
-                                                                        0.0,
-                                                                        0.0, False)
+                                                        cs_junk.K_p,
+                                                        0.0,
+                                                        0.0,
+                                                        0.0, False)
 
                             # Reset the remaining vote data..
                             n.measured_at = prev_votes.vote_map[n.fingerprint].measured_at
@@ -727,7 +747,7 @@ def main(argv):
                         # represents the client migration rate for Guards.. But who
                         # knows how to represent that and still KISS?
                         if n.fingerprint in prev_consensus and \
-                            ("Guard" in prev_consensus[n.fingerprint].flags \
+                            ("Guard" in prev_consensus[n.fingerprint].flags
                              and "Exit" in prev_consensus[n.fingerprint].flags):
                             # For section2-equivalent mode and/or use_mercy, we should
                             # not use Wgd
@@ -736,25 +756,25 @@ def main(argv):
                             else:
                                 weight = (1.0-cs_junk.bw_weights["Wgd"])
                             n.new_bw = n.get_pid_bw(prev_votes.vote_map[n.fingerprint],
-                                                            cs_junk.K_p*weight,
-                                                            cs_junk.K_i*weight,
-                                                            cs_junk.K_d*weight,
-                                                            cs_junk.K_i_decay)
+                                                    cs_junk.K_p*weight,
+                                                    cs_junk.K_i*weight,
+                                                    cs_junk.K_d*weight,
+                                                    cs_junk.K_i_decay)
                         else:
                             n.new_bw = n.get_pid_bw(prev_votes.vote_map[n.fingerprint],
-                                                            cs_junk.K_p,
-                                                            cs_junk.K_i,
-                                                            cs_junk.K_d,
-                                                            cs_junk.K_i_decay)
+                                                    cs_junk.K_p,
+                                                    cs_junk.K_i,
+                                                    cs_junk.K_d,
+                                                    cs_junk.K_i_decay)
                 else:
                     # Reset values. Don't vote/sample this measurement round.
                     n.revert_to_vote(prev_votes.vote_map[n.fingerprint])
-            else: # No prev vote, pure consensus feedback this round
+            else:  # No prev vote, pure consensus feedback this round
                 n.new_bw = n.use_bw + cs_junk.K_p*n.use_bw*n.pid_error
                 n.pid_error_sum = n.pid_error
                 n.pid_bw = n.new_bw
                 logger.debug("No prev vote for node "+n.nickname+": Consensus feedback")
-        else: # No PID feedback
+        else:  # No PID feedback
             # Choose the larger between sbw and fbw
             if n.sbw_ratio > n.fbw_ratio:
                 n.ratio = n.sbw_ratio
@@ -764,17 +784,17 @@ def main(argv):
             n.pid_error = 0
             n.pid_error_sum = 0
             n.new_bw = n.desc_bw*n.ratio
-            n.pid_bw = n.new_bw # for transition between pid/no-pid
+            n.pid_bw = n.new_bw  # for transition between pid/no-pid
 
         n.change = n.new_bw - n.desc_bw
 
         if n.fingerprint in prev_consensus:
-            if prev_consensus[n.fingerprint].bandwidth != None:
+            if prev_consensus[n.fingerprint].bandwidth is not None:
                 prev_consensus[n.fingerprint].measured = True
                 tot_net_bw += n.new_bw
-            if IGNORE_GUARDS \
-                     and ("Guard" in prev_consensus[n.fingerprint].flags and not "Exit" in \
-                                    prev_consensus[n.fingerprint].flags):
+            if (IGNORE_GUARDS and
+                ("Guard" in prev_consensus[n.fingerprint].flags and
+                 "Exit" not in prev_consensus[n.fingerprint].flags)):
                 logger.info("Skipping voting for guard "+n.nickname)
                 n.ignore = True
             elif "Authority" in prev_consensus[n.fingerprint].flags:
@@ -787,40 +807,40 @@ def main(argv):
             logger.warning("Bandwidth of "+n.node_class()+" node "+n.nickname+"="+n.fingerprint+" exceeded maxint32: "+str(n.new_bw))
             n.new_bw = 0x7fffffff
         if cs_junk.T_i > 0 and cs_junk.T_i_decay > 0 \
-             and math.fabs(n.pid_error_sum) > \
-                     math.fabs(2*cs_junk.T_i*n.pid_error/cs_junk.T_i_decay):
-            logger.info("Large pid_error_sum for node "+n.fingerprint+"="+n.nickname+": "+
-                                     str(n.pid_error_sum)+" vs "+str(n.pid_error))
+            and math.fabs(n.pid_error_sum) > \
+                math.fabs(2*cs_junk.T_i*n.pid_error/cs_junk.T_i_decay):
+            logger.info("Large pid_error_sum for node " + n.fingerprint + "=" + n.nickname+": " +
+                        str(n.pid_error_sum) + " vs " + str(n.pid_error))
         if n.new_bw > tot_net_bw*NODE_CAP:
-            logger.info("Clipping extremely fast "+n.node_class()+" node "+n.fingerprint+"="+n.nickname+
-                     " at "+str(100*NODE_CAP)+"% of network capacity ("+
-                     str(n.new_bw)+"->"+str(int(tot_net_bw*NODE_CAP))+") "+
-                     " pid_error="+str(n.pid_error)+
-                     " pid_error_sum="+str(n.pid_error_sum))
+            logger.info("Clipping extremely fast " + n.node_class() + " node " + n.fingerprint + "=" + n.nickname +
+                        " at " + str(100*NODE_CAP) + "% of network capacity (" +
+                        str(n.new_bw) + "->" + str(int(tot_net_bw*NODE_CAP))+") " +
+                        " pid_error=" + str(n.pid_error) +
+                        " pid_error_sum=" + str(n.pid_error_sum))
             n.new_bw = int(tot_net_bw*NODE_CAP)
-            n.pid_error_sum = 0 # Don't let unused error accumulate...
+            n.pid_error_sum = 0  # Don't let unused error accumulate...
         if n.new_bw <= 0:
             if n.fingerprint in prev_consensus:
-                logger.info(n.node_class()+" node "+n.fingerprint+"="+n.nickname+" has bandwidth <= 0: "+str(n.new_bw))
+                logger.info(n.node_class() + " node " + n.fingerprint + "=" + n.nickname + " has bandwidth <= 0: " + str(n.new_bw))
             else:
-                logger.info("New node "+n.fingerprint+"="+n.nickname+" has bandwidth < 0: "+str(n.new_bw))
+                logger.info("New node " + n.fingerprint + "=" + n.nickname + " has bandwidth < 0: " + str(n.new_bw))
             n.new_bw = 1
 
     oldest_measured = min(map(lambda n: n.measured_at,
-                         filter(lambda n: n.fingerprint in prev_consensus,
-                                             nodes.itervalues())))
+                          filter(lambda n: n.fingerprint in prev_consensus,
+                                 nodes.itervalues())))
     logger.info("Oldest measured node: "+time.ctime(oldest_measured))
 
     oldest_updated = min(map(lambda n: n.updated_at,
                          filter(lambda n: n.fingerprint in prev_consensus,
-                                             nodes.itervalues())))
+                                nodes.itervalues())))
     logger.info("Oldest updated node: "+time.ctime(oldest_updated))
 
     missed_nodes = 0.0
     missed_bw = 0
     tot_bw = 0
     for n in prev_consensus.itervalues():
-        if n.bandwidth != None:
+        if n.bandwidth is not None:
             tot_bw += n.bandwidth
         if not n.measured:
             if "Fast" in n.flags and "Running" in n.flags:
@@ -831,21 +851,21 @@ def main(argv):
                 # TODO: Check the range of the bandwidth value.
                 # NOTE: Using network status, as it has all online relays
                 if r and r.bandwidth > 0:
-                    #if time.mktime(r.published.utctimetuple()) - r.uptime \
+                    # if time.mktime(r.published.utctimetuple()) - r.uptime \
                     #             < oldest_timestamp:
                     missed_nodes += 1.0
-                    if n.bandwidth == None:
+                    if n.bandwidth is None:
                         missed_bw += r.bandwidth
                     else:
                         missed_bw += n.bandwidth
                     # We still tend to miss about 80 nodes even with these
                     # checks.. Possibly going in and out of hibernation?
-                    logger.debug("Didn't measure "+n.fingerprint+"="+n.nickname+" at "+str(round((100.0*n.list_rank)/max_rank,1))+" "+str(n.bandwidth))
+                    logger.debug("Didn't measure " + n.fingerprint + "=" + n.nickname + " at " + str(round((100.0*n.list_rank)/max_rank, 1)) + " " + str(n.bandwidth))
 
-    measured_pct = round(100.0*len(nodes)/(len(nodes)+missed_nodes),1)
-    measured_bw_pct = 100.0 - round((100.0*missed_bw)/tot_bw,1)
+    measured_pct = round(100.0*len(nodes)/(len(nodes)+missed_nodes), 1)
+    measured_bw_pct = 100.0 - round((100.0*missed_bw)/tot_bw, 1)
     if measured_pct < MIN_REPORT:
-        logger.info("Did not measure "+str(MIN_REPORT)+"% of nodes yet ("+str(measured_pct)+"%)")
+        logger.info("Did not measure " + str(MIN_REPORT) + "% of nodes yet (" + str(measured_pct) + "%)")
         sys.exit(1)
 
     # Notification hack because #2286/#4359 is annoying arma
@@ -862,30 +882,28 @@ def main(argv):
         c_nodes = filter(lambda n: n.node_class() == cl, nodes.itervalues())
         nc_nodes = filter(lambda n: n.pid_error < 0, c_nodes)
         pc_nodes = filter(lambda n: n.pid_error > 0, c_nodes)
-        logger.info("Avg "+cl+"    pid_error="+str(sum(map(lambda n: n.pid_error, c_nodes))/len(c_nodes)))
-        logger.info("Avg "+cl+" |pid_error|="+str(sum(map(lambda n: abs(n.pid_error), c_nodes))/len(c_nodes)))
-        logger.info("Avg "+cl+" +pid_error=+"+str(sum(map(lambda n: n.pid_error, pc_nodes))/len(pc_nodes)))
-        logger.info("Avg "+cl+" -pid_error="+str(sum(map(lambda n: n.pid_error, nc_nodes))/len(nc_nodes)))
+        logger.info("Avg " + cl + " pid_error=" + str(sum(map(lambda n: n.pid_error, c_nodes))/len(c_nodes)))
+        logger.info("Avg " + cl + " |pid_error|=" + str(sum(map(lambda n: abs(n.pid_error), c_nodes))/len(c_nodes)))
+        logger.info("Avg " + cl + " +pid_error=+" + str(sum(map(lambda n: n.pid_error, pc_nodes))/len(pc_nodes)))
+        logger.info("Avg " + cl + " -pid_error=" + str(sum(map(lambda n: n.pid_error, nc_nodes))/len(nc_nodes)))
 
     n_nodes = filter(lambda n: n.pid_error < 0, nodes.itervalues())
     p_nodes = filter(lambda n: n.pid_error > 0, nodes.itervalues())
-    logger.info("Avg network    pid_error="+str(sum(map(lambda n: n.pid_error, nodes.itervalues()))/len(nodes)))
-    logger.info("Avg network |pid_error|="+str(sum(map(lambda n: abs(n.pid_error), nodes.itervalues()))/len(nodes)))
-    logger.info("Avg network +pid_error=+"+str(sum(map(lambda n: n.pid_error, p_nodes))/len(p_nodes)))
-    logger.info("Avg network -pid_error="+str(sum(map(lambda n: n.pid_error, n_nodes))/len(n_nodes)))
+    logger.info("Avg network pid_error=" + str(sum(map(lambda n: n.pid_error, nodes.itervalues()))/len(nodes)))
+    logger.info("Avg network |pid_error|=" + str(sum(map(lambda n: abs(n.pid_error), nodes.itervalues()))/len(nodes)))
+    logger.info("Avg network +pid_error=+" + str(sum(map(lambda n: n.pid_error, p_nodes))/len(p_nodes)))
+    logger.info("Avg network -pid_error=" + str(sum(map(lambda n: n.pid_error, n_nodes))/len(n_nodes)))
 
-
-    logger.info(
-             "Measured "+str(measured_pct) +"% of all tor nodes ("
-             +str(measured_bw_pct)+"% of previous consensus bw).")
+    logger.info("Measured " + str(measured_pct) + "% of all tor nodes ("
+                + str(measured_bw_pct) + "% of previous consensus bw).")
 
     n_print = nodes.values()
-    n_print.sort(lambda x,y: int(y.pid_error*1000) - int(x.pid_error*1000))
+    n_print.sort(lambda x, y: int(y.pid_error*1000) - int(x.pid_error*1000))
 
     for scanner in scanner_timestamps.iterkeys():
-        scan_age = int(round(scanner_timestamps[scanner],0))
+        scan_age = int(round(scanner_timestamps[scanner], 0))
         if scan_age < time.time() - MAX_SCAN_AGE:
-            logger.warning("Bandwidth scanner "+scanner+" stale. Possible dead bwauthority.py. Timestamp: "+time.ctime(scan_age))
+            logger.warning("Bandwidth scanner " + scanner + " stale. Possible dead bwauthority.py. Timestamp: " + time.ctime(scan_age))
 
     out = file(argv[-1], "w")
     out.write(str(scan_age)+"\n")
@@ -894,7 +912,7 @@ def main(argv):
     for n in n_print:
         if not n.ignore:
             # Turns out str() is more accurate than %lf
-            out.write("node_id="+n.fingerprint+" bw="+str(base10_round(n.new_bw))+" nick="+n.nickname+ " measured_at="+str(int(n.measured_at))+" updated_at="+str(int(n.updated_at))+" pid_error="+str(n.pid_error)+" pid_error_sum="+str(n.pid_error_sum)+" pid_bw="+str(int(n.pid_bw))+" pid_delta="+str(n.pid_delta)+" circ_fail="+str(n.circ_fail_rate)+"\n")
+            out.write("node_id=" + n.fingerprint + " bw=" + str(base10_round(n.new_bw)) + " nick=" + n.nickname + " measured_at=" + str(int(n.measured_at))+" updated_at="+str(int(n.updated_at))+" pid_error="+str(n.pid_error)+" pid_error_sum="+str(n.pid_error_sum)+" pid_bw="+str(int(n.pid_bw))+" pid_delta="+str(n.pid_delta)+" circ_fail="+str(n.circ_fail_rate)+"\n")
     out.close()
 
     write_file_list(argv[1])
