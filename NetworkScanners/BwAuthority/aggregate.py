@@ -7,15 +7,21 @@ import socket
 import time
 import traceback
 import ConfigParser
+import logging
 
 import stem
 from stem.control import Controller
 from stem.descriptor.remote import DescriptorDownloader
 from stem.descriptor import DocumentHandler
 
-sys.path.append("../../")
-from TorCtl.TorUtil import plog
-from TorCtl import TorCtl
+# Set up logging
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter(fmt="%(asctime)s [%(levelname)s]: "
+                                           "%(message)s"))
+
+logger = logging.getLogger('aggregate')
+logger.addHandler(handler)
+logger.setLevel(logging.DEBUG)
 
 bw_files = []
 nodes = {}
@@ -70,12 +76,12 @@ def base10_round(bw_val):
     # to minimize changes for consensus diffs.
     # Resulting error is +/-0.5%
     if bw_val == 0:
-        plog("INFO", "Zero input bandwidth.. Upping to 1")
+        logger.info("Zero input bandwidth.. Upping to 1")
         return 1
     else:
         ret = int(max((1000, round(round(bw_val,-(int(math.log10(bw_val))-2)), -3)))/1000)
         if ret == 0:
-            plog("INFO", "Zero output bandwidth.. Upping to 1")
+            logger.info("Zero output bandwidth.. Upping to 1")
             return 1
         return ret
 
@@ -209,7 +215,7 @@ class Vote:
             self.pid_delta = float(re.search("[\s]*pid_delta=([\S]+)[\s]*", line).group(1))
             self.pid_bw = float(re.search("[\s]*pid_bw=([\S]+)[\s]*", line).group(1))
         except:
-            plog("NOTICE", "No previous PID data.")
+            logger.info("No previous PID data.")
             self.pid_bw = self.bw
             self.pid_error = 0
             self.pid_delta = 0
@@ -217,7 +223,7 @@ class Vote:
         try:
             self.updated_at = int(re.search("[\s]*updated_at=([\S]+)[\s]*", line).group(1))
         except:
-            plog("INFO", "No updated_at field for "+self.nickname+"="+self.fingerprint)
+            logger.info("No updated_at field for "+self.nickname+"="+self.fingerprint)
             self.updated_at = self.measured_at
 
 
@@ -231,7 +237,7 @@ class VoteSet:
                 vote = Vote(line)
                 self.vote_map[vote.fingerprint] = vote
         except IOError:
-            plog("NOTICE", "No previous vote data.")
+            logger.info("No previous vote data.")
 
 
 # Misc items we need to get out of the consensus
@@ -239,7 +245,7 @@ class ConsensusJunk:
     def __init__(self, c):
 
         # Download a copy of a raw network-status document
-        plog("DEBUG", "Downloading network status")
+        logger.debug("Downloading network status")
         network_status = DescriptorDownloader(timeout=10).get_consensus(
             document_handler=DocumentHandler.BARE_DOCUMENT).run()[0]
 
@@ -262,46 +268,46 @@ class ConsensusJunk:
         self.T_i_decay = T_i_decay
 
         if not c_params:
-            plog("NOTICE", "Bw auth PID control disabled due to parse error.")
+            logger.info("Bw auth PID control disabled due to parse error.")
         else:
             if c_params.get('bwauthpid') == 0:
                 self.bwauth_pid_control = False
             if c_params.get('bwauthnsbw') == 1:
                 self.use_desc_bw = False
-                plog("INFO", "Using NS bandwidth directly for feedback")
+                logger.info("Using NS bandwidth directly for feedback")
             if c_params.get('bwauthcircs') == 1:
                 self.use_circ_fails = True
-                plog("INFO", "Counting circuit failures")
+                logger.info("Counting circuit failures")
             if c_params.get('bwauthbestratio') == 0:
                 self.use_best_ratio = False
-                plog("INFO", "Choosing larger of sbw vs fbw")
+                logger.info("Choosing larger of sbw vs fbw")
             if c_params.get('bwauthbyclass') == 1:
                 self.group_by_class = True
-                plog("INFO", "Grouping nodes by flag-class")
+                logger.info("Grouping nodes by flag-class")
             if c_params.get('bwauthpidtgt') == 1:
                 self.use_pid_tgt = True
-                plog("INFO", "Using filtered PID target")
+                logger.info("Using filtered PID target")
             if c_params.get('bwauthmercy') == 1:
                 self.use_mercy = True
-                plog("INFO", "Showing mercy on gimpy nodes")
+                logger.info("Showing mercy on gimpy nodes")
             if c_params.get('bwauthkp'):
                 self.K_p = int(c_params.get('bwauthkp'))/10000.0
-                plog("INFO", "Got K_p=%f from consensus." % self.K_p)
+                logger.info("Got K_p=%f from consensus." % self.K_p)
             if c_params.get('bwauthti'):
                 self.T_i = (int(c_params.get('bwauthti'))/10000.0)
-                plog("INFO", "Got T_i=%f from consensus." % self.T_i)
+                logger.info("Got T_i=%f from consensus." % self.T_i)
             if c_params.get('bwauthtd'):
                 self.T_d = (int(c_params.get('bwauthtd'))/10000.0)
-                plog("INFO", "Got T_d=%f from consensus." % self.T_d)
+                logger.info("Got T_d=%f from consensus." % self.T_d)
             if c_params.get('bwauthtidecay'):
                 self.T_i_decay = (int(c_params.get('bwauthtidecay'))/10000.0)
-                plog("INFO", "Got T_i_decay=%f from consensus." % self.T_i_decay)
+                logger.info("Got T_i_decay=%f from consensus." % self.T_i_decay)
             if c_params.get('bwauthpidmax'):
                 self.pid_max = (int(c_params.get('bwauthpidmax'))/10000.0)
-                plog("INFO", "Got pid_max=%f from consensus." % self.pid_max)
+                logger.info("Got pid_max=%f from consensus." % self.pid_max)
             if c_params.get('bwauthguardrate'):
                 self.guard_sample_rate = int(c_params.get('bwauthguardrate'))
-                plog("INFO", "Got guard_sample_rate=%d from consensus." %
+                logger.info("Got guard_sample_rate=%d from consensus." %
                      self.guard_sample_rate)
 
         if self.T_i == 0:
@@ -313,7 +319,7 @@ class ConsensusJunk:
 
         self.K_d = self.K_p*self.T_d
 
-        plog("INFO", "Got K_p=%f K_i=%f K_d=%f K_i_decay=%f" %
+        logger.info("Got K_p=%f K_i=%f K_d=%f K_i_decay=%f" %
              (self.K_p, self.K_i, self.K_d, self.K_i_decay))
 
         self.bw_weights = {}
@@ -321,7 +327,7 @@ class ConsensusJunk:
             for weight, value in bw_weights.items():
                 self.bw_weights[weight] = int(value)/10000.0
         else:
-            plog("WARN", "No bandwidth weights in consensus!")
+            logger.warning("No bandwidth weights in consensus!")
             self.bw_weights["Wgd"] = 0
             self.bw_weights["Wgg"] = 1.0
 
@@ -381,19 +387,19 @@ def main(argv):
     try:
         c = Controller.from_port(address=control_host, port=control_port)
     except stem.SocketError as exc:
-        plog("ERROR", "Unable to connect to Tor control port: %s", exc)
+        logger.error("Unable to connect to Tor control port: %s", exc)
         sys.exit(1)
     else:
-        plog("DEBUG", "Successfully connected to the Tor control port.")
+        logger.debug("Successfully connected to the Tor control port.")
 
     try:
         # Stem will try read the control_aut_file automatically
         c.authenticate(password=control_pass)
     except stem.connection.AuthenticationFailure as exc:
-        plog("ERROR", "Unable to authenticate to Tor control port: %s", exc)
+        logger.error("Unable to authenticate to Tor control port: %s", exc)
         sys.exit(1)
     else:
-        plog("DEBUG", "Successfully authenticated to the Tor control port.")
+        logger.debug("Successfully authenticated to the Tor control port.")
 
     ns_list = list(c.get_network_statuses())
 
@@ -413,7 +419,7 @@ def main(argv):
         n = ns_list[i]
         n.list_rank = i
         if n.bandwidth == None:
-            plog("NOTICE", "Your Tor is not providing NS w bandwidths for "+n.fingerprint)
+            logger.info("Your Tor is not providing NS w bandwidths for "+n.fingerprint)
         else:
             got_ns_bw = True
         n.measured = False
@@ -422,7 +428,7 @@ def main(argv):
     if not got_ns_bw:
         # Sometimes the consensus lacks a descriptor. In that case,
         # it will skip outputting
-        plog("ERROR", "Your Tor is not providing NS w bandwidths!")
+        logger.error("Your Tor is not providing NS w bandwidths!")
         sys.exit(0)
 
     # Take the most recent timestamp from each scanner
@@ -449,7 +455,7 @@ def main(argv):
                                 # This filter is just to remove REALLY old files
                                 if time.time() - timestamp > MAX_AGE:
                                     sqlf = f.replace("bws-", "sql-")
-                                    plog("INFO", "Removing old file "+f+" and "+sqlf)
+                                    logger.info("Removing old file "+f+" and "+sqlf)
                                     os.remove(sr+"/"+f)
                                     try:
                                         os.remove(sr+"/"+sqlf)
@@ -476,16 +482,16 @@ def main(argv):
                     n = nodes[line.fingerprint]
                 n.add_line(line)
             except ValueError,e:
-                plog("NOTICE", "Conversion error "+str(e)+" at "+l)
+                logger.info("Conversion error "+str(e)+" at "+l)
             except AttributeError, e:
-                plog("NOTICE", "Slice file format error "+str(e)+" at "+l)
+                logger.info("Slice file format error "+str(e)+" at "+l)
             except Exception, e:
-                plog("WARN", "Unknown slice parse error "+str(e)+" at "+l)
+                logger.warning("Unknown slice parse error "+str(e)+" at "+l)
                 traceback.print_exc()
         fp.close()
 
     if len(nodes) == 0:
-        plog("NOTICE", "No scan results yet.")
+        logger.info("No scan results yet.")
         sys.exit(1)
 
     for fingerprint in nodes.iterkeys():
@@ -501,7 +507,7 @@ def main(argv):
         # Penalize nodes for circuit failure: it indicates CPU pressure
         # TODO: Potentially penalize for stream failure, if we run into
         # socket exhaustion issues..
-        plog("INFO", "PID control enabled")
+        logger.info("PID control enabled")
 
         # TODO: Please forgive me for this, I wanted to see
         # these loglines, so we go aead and run this code regardless of
@@ -523,16 +529,16 @@ def main(argv):
                 prev_pid_avg = pid_tgt_avg[cl]
                 pid_tgt_avg[cl] = sum(map(lambda n: n.filt_bw, f_nodes))/float(len(f_nodes))
 
-            plog("INFO", "Network true_filt_avg["+cl+"]: "+str(true_filt_avg[cl]))
-            plog("INFO", "Network pid_tgt_avg["+cl+"]: "+str(pid_tgt_avg[cl]))
-            plog("INFO", "Network true_circ_avg["+cl+"]: "+str(true_circ_avg[cl]))
+            logger.info("Network true_filt_avg["+cl+"]: "+str(true_filt_avg[cl]))
+            logger.info("Network pid_tgt_avg["+cl+"]: "+str(pid_tgt_avg[cl]))
+            logger.info("Network true_circ_avg["+cl+"]: "+str(true_circ_avg[cl]))
 
         filt_avg = sum(map(lambda n: n.filt_bw, nodes.itervalues()))/float(len(nodes))
         strm_avg = sum(map(lambda n: n.strm_bw, nodes.itervalues()))/float(len(nodes))
         circ_avg = sum(map(lambda n: (1.0-n.circ_fail_rate),
                                              nodes.itervalues()))/float(len(nodes))
-        plog("INFO", "Network filt_avg: "+str(filt_avg))
-        plog("INFO", "Network circ_avg: "+str(circ_avg))
+        logger.info("Network filt_avg: "+str(filt_avg))
+        logger.info("Network circ_avg: "+str(circ_avg))
 
         if not cs_junk.group_by_class:
             # FIXME: This may be expensive
@@ -551,10 +557,10 @@ def main(argv):
                 true_circ_avg[cl] = circ_avg
                 pid_tgt_avg[cl] = pid_avg
 
-            plog("INFO", "Network pid_avg: "+str(pid_avg))
+            logger.info("Network pid_avg: "+str(pid_avg))
 
     else:
-        plog("INFO", "PID control disabled")
+        logger.info("PID control disabled")
         filt_avg = sum(map(lambda n: n.filt_bw, nodes.itervalues()))/float(len(nodes))
         strm_avg = sum(map(lambda n: n.strm_bw, nodes.itervalues()))/float(len(nodes))
         for cl in ["Guard+Exit", "Guard", "Exit", "Middle"]:
@@ -586,10 +592,10 @@ def main(argv):
         # TODO: We may want to try to use this info to autocompute T_d and
         # maybe T_i?
         if node_cnt > 0:
-            plog("INFO", "Avg of "+str(node_cnt)+" node update intervals: "+str((node_measure_time/node_cnt)/3600.0))
+            logger.info("Avg of "+str(node_cnt)+" node update intervals: "+str((node_measure_time/node_cnt)/3600.0))
 
         if guard_cnt > 0:
-            plog("INFO", "Avg of "+str(guard_cnt)+" guard measurement interval: "+str((guard_measure_time/guard_cnt)/3600.0))
+            logger.info("Avg of "+str(guard_cnt)+" guard measurement interval: "+str((guard_measure_time/guard_cnt)/3600.0))
 
     tot_net_bw = 0
     for n in nodes.itervalues():
@@ -633,7 +639,7 @@ def main(argv):
                 if (1.0-n.circ_fail_rate) < true_circ_avg[n.node_class()]:
                     circ_error = -n.circ_fail_rate  # ((1.0-fail) - 1.0)/1.0
                     if circ_error < 0 and circ_error < n.pid_error:
-                        plog("INFO",
+                        logger.info(
                              "CPU overload for %s node %s=%s desc=%d ns=%d pid_error=%f circ_error=%f circ_fail=%f" %
                              (n.node_class(), n.nickname, n.fingerprint, n.desc_bw, n.ns_bw,
                               n.pid_error, circ_error, n.circ_fail_rate))
@@ -642,12 +648,12 @@ def main(argv):
             # Don't accumulate too much amplification for fast nodes
             if cs_junk.use_desc_bw:
                 if n.pid_error_sum > cs_junk.pid_max and n.pid_error > 0:
-                    plog("INFO", "Capping feedback for %s node %s=%s desc=%d ns=%d pid_error_sum=%f" %
+                    logger.info("Capping feedback for %s node %s=%s desc=%d ns=%d pid_error_sum=%f" %
                             (n.node_class(), n.nickname, n.fingerprint, n.desc_bw, n.ns_bw, n.pid_error_sum))
                     n.pid_error_sum = cs_junk.pid_max
             else:
                 if float(n.ns_bw)/n.desc_bw > cs_junk.pid_max and n.pid_error > 0:
-                    plog("INFO", "Capping feedback for %s node %s=%s desc=%d ns=%d pid_error=%f" %
+                    logger.info("Capping feedback for %s node %s=%s desc=%d ns=%d pid_error=%f" %
                             (n.node_class(), n.nickname, n.fingerprint, n.desc_bw, n.ns_bw, n.pid_error))
                     n.pid_error = 0
                     n.pid_error_sum = 0
@@ -658,11 +664,11 @@ def main(argv):
                     # If node was demoted in the past and we plan to demote it again,
                     # let's just not and say we did.
                     if n.desc_bw > n.ns_bw and n.pid_error < 0:
-                        plog("DEBUG", "Showing mercy for %s node %s=%s desc=%d ns=%d pid_error=%f" %
+                        logger.debug("Showing mercy for %s node %s=%s desc=%d ns=%d pid_error=%f" %
                                  (n.node_class(), n.nickname, n.fingerprint, n.desc_bw, n.ns_bw, n.pid_error))
                         n.use_bw = n.desc_bw
                 if n.pid_error_sum < 0 and n.pid_error < 0:
-                    plog("DEBUG", "Showing mercy for %s node %s=%s desc=%d ns=%d pid_error_sum=%f" %
+                    logger.debug("Showing mercy for %s node %s=%s desc=%d ns=%d pid_error_sum=%f" %
                             (n.node_class(), n.nickname, n.fingerprint, n.desc_bw, n.ns_bw, n.pid_error_sum))
                     n.pid_error_sum = 0
 
@@ -747,7 +753,7 @@ def main(argv):
                 n.new_bw = n.use_bw + cs_junk.K_p*n.use_bw*n.pid_error
                 n.pid_error_sum = n.pid_error
                 n.pid_bw = n.new_bw
-                plog("DEBUG", "No prev vote for node "+n.nickname+": Consensus feedback")
+                logger.debug("No prev vote for node "+n.nickname+": Consensus feedback")
         else: # No PID feedback
             # Choose the larger between sbw and fbw
             if n.sbw_ratio > n.fbw_ratio:
@@ -769,24 +775,24 @@ def main(argv):
             if IGNORE_GUARDS \
                      and ("Guard" in prev_consensus[n.fingerprint].flags and not "Exit" in \
                                     prev_consensus[n.fingerprint].flags):
-                plog("INFO", "Skipping voting for guard "+n.nickname)
+                logger.info("Skipping voting for guard "+n.nickname)
                 n.ignore = True
             elif "Authority" in prev_consensus[n.fingerprint].flags:
-                plog("DEBUG", "Skipping voting for authority "+n.nickname)
+                logger.debug("Skipping voting for authority "+n.nickname)
                 n.ignore = True
 
     # Go through the list and cap them to NODE_CAP
     for n in nodes.itervalues():
         if n.new_bw >= 0x7fffffff:
-            plog("WARN", "Bandwidth of "+n.node_class()+" node "+n.nickname+"="+n.fingerprint+" exceeded maxint32: "+str(n.new_bw))
+            logger.warning("Bandwidth of "+n.node_class()+" node "+n.nickname+"="+n.fingerprint+" exceeded maxint32: "+str(n.new_bw))
             n.new_bw = 0x7fffffff
         if cs_junk.T_i > 0 and cs_junk.T_i_decay > 0 \
              and math.fabs(n.pid_error_sum) > \
                      math.fabs(2*cs_junk.T_i*n.pid_error/cs_junk.T_i_decay):
-            plog("NOTICE", "Large pid_error_sum for node "+n.fingerprint+"="+n.nickname+": "+
+            logger.info("Large pid_error_sum for node "+n.fingerprint+"="+n.nickname+": "+
                                      str(n.pid_error_sum)+" vs "+str(n.pid_error))
         if n.new_bw > tot_net_bw*NODE_CAP:
-            plog("INFO", "Clipping extremely fast "+n.node_class()+" node "+n.fingerprint+"="+n.nickname+
+            logger.info("Clipping extremely fast "+n.node_class()+" node "+n.fingerprint+"="+n.nickname+
                      " at "+str(100*NODE_CAP)+"% of network capacity ("+
                      str(n.new_bw)+"->"+str(int(tot_net_bw*NODE_CAP))+") "+
                      " pid_error="+str(n.pid_error)+
@@ -795,20 +801,20 @@ def main(argv):
             n.pid_error_sum = 0 # Don't let unused error accumulate...
         if n.new_bw <= 0:
             if n.fingerprint in prev_consensus:
-                plog("INFO", n.node_class()+" node "+n.fingerprint+"="+n.nickname+" has bandwidth <= 0: "+str(n.new_bw))
+                logger.info(n.node_class()+" node "+n.fingerprint+"="+n.nickname+" has bandwidth <= 0: "+str(n.new_bw))
             else:
-                plog("INFO", "New node "+n.fingerprint+"="+n.nickname+" has bandwidth < 0: "+str(n.new_bw))
+                logger.info("New node "+n.fingerprint+"="+n.nickname+" has bandwidth < 0: "+str(n.new_bw))
             n.new_bw = 1
 
     oldest_measured = min(map(lambda n: n.measured_at,
                          filter(lambda n: n.fingerprint in prev_consensus,
                                              nodes.itervalues())))
-    plog("INFO", "Oldest measured node: "+time.ctime(oldest_measured))
+    logger.info("Oldest measured node: "+time.ctime(oldest_measured))
 
     oldest_updated = min(map(lambda n: n.updated_at,
                          filter(lambda n: n.fingerprint in prev_consensus,
                                              nodes.itervalues())))
-    plog("INFO", "Oldest updated node: "+time.ctime(oldest_updated))
+    logger.info("Oldest updated node: "+time.ctime(oldest_updated))
 
     missed_nodes = 0.0
     missed_bw = 0
@@ -834,21 +840,21 @@ def main(argv):
                         missed_bw += n.bandwidth
                     # We still tend to miss about 80 nodes even with these
                     # checks.. Possibly going in and out of hibernation?
-                    plog("DEBUG", "Didn't measure "+n.fingerprint+"="+n.nickname+" at "+str(round((100.0*n.list_rank)/max_rank,1))+" "+str(n.bandwidth))
+                    logger.debug("Didn't measure "+n.fingerprint+"="+n.nickname+" at "+str(round((100.0*n.list_rank)/max_rank,1))+" "+str(n.bandwidth))
 
     measured_pct = round(100.0*len(nodes)/(len(nodes)+missed_nodes),1)
     measured_bw_pct = 100.0 - round((100.0*missed_bw)/tot_bw,1)
     if measured_pct < MIN_REPORT:
-        plog("NOTICE", "Did not measure "+str(MIN_REPORT)+"% of nodes yet ("+str(measured_pct)+"%)")
+        logger.info("Did not measure "+str(MIN_REPORT)+"% of nodes yet ("+str(measured_pct)+"%)")
         sys.exit(1)
 
     # Notification hack because #2286/#4359 is annoying arma
     if measured_bw_pct < 75:
-        plog("WARN",
+        logger.warning(
              "Only measured %f of the previous consensus bandwidth despite measuring %f of the nodes" %
              (measured_bw_pct, measured_pct))
     elif measured_bw_pct < 95:
-        plog("NOTICE",
+        logger.info(
              "Only measured %f of the previous consensus bandwidth despite measuring %f of the nodes" %
              (measured_bw_pct, measured_pct))
 
@@ -856,20 +862,20 @@ def main(argv):
         c_nodes = filter(lambda n: n.node_class() == cl, nodes.itervalues())
         nc_nodes = filter(lambda n: n.pid_error < 0, c_nodes)
         pc_nodes = filter(lambda n: n.pid_error > 0, c_nodes)
-        plog("INFO", "Avg "+cl+"    pid_error="+str(sum(map(lambda n: n.pid_error, c_nodes))/len(c_nodes)))
-        plog("INFO", "Avg "+cl+" |pid_error|="+str(sum(map(lambda n: abs(n.pid_error), c_nodes))/len(c_nodes)))
-        plog("INFO", "Avg "+cl+" +pid_error=+"+str(sum(map(lambda n: n.pid_error, pc_nodes))/len(pc_nodes)))
-        plog("INFO", "Avg "+cl+" -pid_error="+str(sum(map(lambda n: n.pid_error, nc_nodes))/len(nc_nodes)))
+        logger.info("Avg "+cl+"    pid_error="+str(sum(map(lambda n: n.pid_error, c_nodes))/len(c_nodes)))
+        logger.info("Avg "+cl+" |pid_error|="+str(sum(map(lambda n: abs(n.pid_error), c_nodes))/len(c_nodes)))
+        logger.info("Avg "+cl+" +pid_error=+"+str(sum(map(lambda n: n.pid_error, pc_nodes))/len(pc_nodes)))
+        logger.info("Avg "+cl+" -pid_error="+str(sum(map(lambda n: n.pid_error, nc_nodes))/len(nc_nodes)))
 
     n_nodes = filter(lambda n: n.pid_error < 0, nodes.itervalues())
     p_nodes = filter(lambda n: n.pid_error > 0, nodes.itervalues())
-    plog("INFO", "Avg network    pid_error="+str(sum(map(lambda n: n.pid_error, nodes.itervalues()))/len(nodes)))
-    plog("INFO", "Avg network |pid_error|="+str(sum(map(lambda n: abs(n.pid_error), nodes.itervalues()))/len(nodes)))
-    plog("INFO", "Avg network +pid_error=+"+str(sum(map(lambda n: n.pid_error, p_nodes))/len(p_nodes)))
-    plog("INFO", "Avg network -pid_error="+str(sum(map(lambda n: n.pid_error, n_nodes))/len(n_nodes)))
+    logger.info("Avg network    pid_error="+str(sum(map(lambda n: n.pid_error, nodes.itervalues()))/len(nodes)))
+    logger.info("Avg network |pid_error|="+str(sum(map(lambda n: abs(n.pid_error), nodes.itervalues()))/len(nodes)))
+    logger.info("Avg network +pid_error=+"+str(sum(map(lambda n: n.pid_error, p_nodes))/len(p_nodes)))
+    logger.info("Avg network -pid_error="+str(sum(map(lambda n: n.pid_error, n_nodes))/len(n_nodes)))
 
 
-    plog("NOTICE",
+    logger.info(
              "Measured "+str(measured_pct) +"% of all tor nodes ("
              +str(measured_bw_pct)+"% of previous consensus bw).")
 
@@ -879,7 +885,7 @@ def main(argv):
     for scanner in scanner_timestamps.iterkeys():
         scan_age = int(round(scanner_timestamps[scanner],0))
         if scan_age < time.time() - MAX_SCAN_AGE:
-            plog("WARN", "Bandwidth scanner "+scanner+" stale. Possible dead bwauthority.py. Timestamp: "+time.ctime(scan_age))
+            logger.warning("Bandwidth scanner "+scanner+" stale. Possible dead bwauthority.py. Timestamp: "+time.ctime(scan_age))
 
     out = file(argv[-1], "w")
     out.write(str(scan_age)+"\n")
@@ -898,10 +904,10 @@ if __name__ == "__main__":
         main(sys.argv)
     except socket.error, e:
         traceback.print_exc()
-        plog("WARN", "Socket error. Are the scanning Tors running?")
+        logger.warning("Socket error. Are the scanning Tors running?")
         sys.exit(1)
     except Exception, e:
-        plog("ERROR", "Exception during aggregate: "+str(e))
+        logger.error("Exception during aggregate: "+str(e))
         traceback.print_exc()
         sys.exit(1)
     sys.exit(0)
