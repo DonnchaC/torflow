@@ -429,11 +429,9 @@ def main(argv):
     # and use the oldest for the timestamp of the result.
     # That way we can ensure all the scanners continue running.
     scanner_timestamps = {}
-    print("checking dir", argv[1:-1], argv)
     for da in argv[1:-1]:
         # First, create a list of the most recent files in the
         # scan dirs that are recent enough
-        plog("DEBUG","Checking for scan files in: {}".format(da))
         for root, dirs, f in os.walk(da):
             for ds in dirs:
                 if re.match("^scanner.[\d+]$", ds):
@@ -441,7 +439,6 @@ def main(argv):
                     for sr, sd, files in os.walk(da+"/"+ds+"/scan-data"):
                         for f in files:
                             if re.search("^bws-[\S]+-done-", f):
-                                plog("DEBUG", "Reading file: %s" % f)
                                 fp = file(sr+"/"+f, "r")
                                 slicenum = sr+"/"+fp.readline()
                                 timestamp = float(fp.readline())
